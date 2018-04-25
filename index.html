@@ -9,7 +9,9 @@
 </style>
 
 <script src="https://d3js.org/d3.v4.min.js"></script>
-<svg width="920" height="620"></svg>
+<svg width="2000" height="2000">
+
+</svg>
 <script>
 const svg = d3.select('svg');
 const geoData = {
@@ -80,11 +82,60 @@ const geoData = {
 };
 var projection = d3
   .geoEquirectangular()
-  .scale(5500)
-  .translate([-2800, -400]);
+  .scale(24000)
+  .translate([-12000, -1300]);
 
 var geoGenerator = d3.geoPath().projection(projection);
 
 // const path = d3.geoPath().projection(chosenProjection);
 svg.append('path').attr('d', geoGenerator(geoData));
+
+d3.csv(
+  'https://raw.githubusercontent.com/Lokgic/chimp/master/chimpdata.csv',
+  data => {
+    let i = 0;
+    let long = parseFloat(data[i].long);
+    let lat = parseFloat(data[i].lat);
+    let pos = [long, lat];
+    let total = data[i].total;
+    console.log(pos);
+    let pt = projection(pos);
+
+    let tex = d =>
+      `seq_num: ${d.seq_num},date ${d.date}, focal_age:${d.focal_age}, time:${
+        d.time
+      }, adult_m:${d.adult_m}, adult_f:${d.adult_f}`;
+    const circle = svg
+      .append('circle')
+      .attr('cx', pt[0])
+      .attr('cy', pt[1])
+      .attr('r', total)
+      .attr('fill', data[i].focal_sex === 'F' ? 'red' : 'blue')
+      .attr('id', 'location');
+    const text = svg
+      .append('text')
+      .attr('x', pt[0])
+      .attr('y', pt[1])
+      .text(tex(data[i]));
+    const t = d3.interval(function(elapsed) {
+      i += 1;
+      long = parseFloat(data[i].long);
+      lat = parseFloat(data[i].lat);
+      pos = [long, lat];
+      total = data[i].total;
+
+      pt = projection(pos);
+      d3
+        .select('#location')
+        .attr('cx', pt[0])
+        .attr('cy', pt[1])
+        .attr('r', total)
+        .attr('fill', data[i].focal_sex === 'F' ? 'red' : 'blue');
+      text
+        .attr('x', pt[0])
+        .attr('y', pt[1])
+        .text(tex(data[i]));
+    }, 20);
+  }
+);
 </script>
