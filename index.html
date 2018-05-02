@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <meta charset="utf=8">
 <style>
-    path {
+    /* path {
       fill: #ccc;
       stroke: #fff;
       stroke-linejoin: round;
-    }
+    } */
 </style>
 
 <script src="https://d3js.org/d3.v4.min.js"></script>
@@ -88,16 +88,22 @@ var projection = d3
 
 var geoGenerator = d3.geoPath().projection(projection);
 
-// const path = d3.geoPath().projection(chosenProjection);
-svg.append('path').attr('d', geoGenerator(geoData));
+
+svg.append('path').attr('d', geoGenerator(geoData)).attr('fill','grey');
+
+const r = 7
+const pie = d3.pie().sort(null).value(d=>d.population)
+
+const path = d3.arc().outerRadius(r).innerRadius(0)
 
 class Community {
   constructor(data, svg, projection, customStyle = {}) {
     let style = {
       fill: 'black',
-      r: 5,
+      r: r,
       ...customStyle
     };
+    this.id = data[0].comm
     this.start = 0;
     this.end = data.length - 1;
     this.current = 0;
@@ -108,13 +114,41 @@ class Community {
       parseFloat(this.data[0].long),
       parseFloat(this.data[0].lat)
     ];
+
     const pt = this.projection(longlat);
-    this.circle = svg
-      .append('circle')
-      .attr('cx', pt[0])
-      .attr('cy', pt[1])
-      .attr('r', style.r)
-      .attr('fill', style.fill);
+    const t = this.getPopulation(this.data[0])
+
+    this.g = svg.append('g').attr('transform',`translate(${pt[0]},${pt[1]})`)
+
+
+    this.text = svg
+      .append('text')
+      .attr('x', pt[0])
+      .attr('y', pt[1])
+      .attr('font-size','5')
+      .text(`${this.id} - total: ${data[0].total}`);
+    this.color = {
+      "male":"#98abc5",
+      "female":"#d89b95",
+      "children":"#ff8c00"
+    }
+    this.arc = this.g.selectAll('path')
+        .data(pie(t))
+        .enter()
+        .append("path")
+        .attr("d", path)
+        .attr("fill", d=> {
+           return this.color[d.data.type];
+
+         });
+
+  }
+  getPopulation(d){
+    return [
+      {type:"male",population:+d.adult_m},
+      {type:"female",population:+d.adult_f},
+      {type:"children",population:d.total - d.adult_m - d.adult_f}
+    ]
   }
   update() {
     const i = this.current >= this.end ? this.start : this.current + 1;
@@ -123,8 +157,14 @@ class Community {
       parseFloat(this.data[i].lat)
     ];
     const pt = this.projection(longlat);
-    this.circle.attr('cx', pt[0]).attr('cy', pt[1]);
-
+    const t = this.getPopulation(this.data[i])
+    this.arc.data(pie(t))
+    this.g.transition().duration(140).attr('transform',`translate(${pt[0]},${pt[1]})`)
+    this.arc
+      .attr('d',path)
+    this.text.attr('x', pt[0])
+    .attr('y', pt[1])
+    .text(`${this.id} - total: ${this.data[i].total}`);
     this.current = i;
   }
 }
@@ -132,6 +172,7 @@ class Community {
 d3.csv(
   'https://raw.githubusercontent.com/Lokgic/chimp/master/chimpdata.csv',
   data => {
+    // console.log(data)
     const MTData = _.filter(data, o => o.comm === 'MT');
     const KKData = _.filter(data, o => o.comm === 'KK');
     let i = 0;
@@ -140,15 +181,28 @@ d3.csv(
     let pos = [long, lat];
     let total = data[i].total;
     let pt = projection(pos);
+    const fps = 150
+
+
+
     const MT = new Community(MTData, svg, projection, { fill: 'red' });
+
     const MTTimer = d3.interval(elapsed => {
       MT.update();
-    }, 20);
+    }, fps);
 
     const KK = new Community(KKData, svg, projection, { fill: 'blue' });
+
+
+
+
     const KKTimer = d3.interval(elapsed => {
       KK.update();
-    }, 20);
+    }, fps);
+
+
+
+
     // let tex = d =>
     //   `seq_num: ${d.seq_num},date ${d.date}, focal_age:${d.focal_age}, time:${
     //     d.time
